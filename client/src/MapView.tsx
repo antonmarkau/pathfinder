@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { MapCenter } from './geocoding';
+import type { RouteGeometry } from './route';
 import type { Stop } from './stops';
 
 const MINSK: mapboxgl.LngLatLike = [27.559, 53.9006];
@@ -15,6 +16,7 @@ type MapViewProps = {
   error: boolean;
   stops: Stop[];
   selecting: boolean;
+  route: RouteGeometry | null;
   onProximityChange: (center: MapCenter) => void;
   onMapClick: (center: MapCenter) => void;
   onStopDrag: (id: string, center: MapCenter) => void;
@@ -25,6 +27,7 @@ export function MapView({
   error,
   stops,
   selecting,
+  route,
   onProximityChange,
   onMapClick,
   onStopDrag,
@@ -164,6 +167,62 @@ export function MapView({
       markers.forEach((marker) => marker.remove());
     };
   }, [map, stops]);
+
+  useEffect(() => {
+    if (!map) {
+      return;
+    }
+
+    const geometry: RouteGeometry = route ?? { type: 'LineString', coordinates: [] };
+    const data = {
+      type: 'Feature' as const,
+      properties: {},
+      geometry,
+    };
+    const existing = map.getSource('route');
+    if (existing?.type === 'geojson') {
+      existing.setData(data);
+    } else {
+      map.addSource('route', { type: 'geojson', data });
+      map.addLayer({
+        id: 'route-casing',
+        type: 'line',
+        source: 'route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 8 },
+      });
+      map.addLayer({
+        id: 'route',
+        type: 'line',
+        source: 'route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#1d6fbf', 'line-width': 5 },
+      });
+    }
+
+    if (route && route.coordinates.length > 1) {
+      const bounds = new mapboxgl.LngLatBounds();
+      for (const coordinate of route.coordinates) {
+        bounds.extend(coordinate);
+      }
+      map.fitBounds(bounds, { padding: 72, maxZoom: 14, duration: 700 });
+    }
+
+    return () => {
+      if (!map.getStyle()) {
+        return;
+      }
+      if (map.getLayer('route')) {
+        map.removeLayer('route');
+      }
+      if (map.getLayer('route-casing')) {
+        map.removeLayer('route-casing');
+      }
+      if (map.getSource('route')) {
+        map.removeSource('route');
+      }
+    };
+  }, [map, route]);
 
   return (
     <section className={selecting ? 'map selecting' : 'map'} aria-label="Map">

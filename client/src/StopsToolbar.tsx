@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AutoComplete, Button } from 'antd';
+import { AutoComplete, Button, Switch } from 'antd';
 import { AimOutlined, CarOutlined, CheckOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { forwardGeocode, parseLatLng, reverseGeocode, type GeocodedPlace, type MapCenter } from './geocoding';
 import { MAX_STOPS, type Stop } from './stops';
@@ -11,7 +11,12 @@ type StopsToolbarProps = {
   stops: Stop[];
   proximity: MapCenter;
   selecting: boolean;
+  roundTrip: boolean;
+  building: boolean;
+  routeError: string | null;
   onSelectingChange: (selecting: boolean) => void;
+  onRoundTripChange: (roundTrip: boolean) => void;
+  onBuildRoute: () => void;
   onStopsChange: (stops: Stop[]) => void;
 };
 
@@ -20,7 +25,12 @@ export function StopsToolbar({
   stops,
   proximity,
   selecting,
+  roundTrip,
+  building,
+  routeError,
   onSelectingChange,
+  onRoundTripChange,
+  onBuildRoute,
   onStopsChange,
 }: StopsToolbarProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -230,7 +240,21 @@ export function StopsToolbar({
       >
         {selecting ? 'Click the map' : 'Select on map'}
       </Button>
-      <Button className="toolbar-action" block disabled color="green" variant="solid" icon={<CarOutlined />}>
+      <div className="round-trip">
+        <span id="round-trip-label">{roundTrip ? 'Round trip' : 'One way'}</span>
+        <Switch checked={roundTrip} onChange={onRoundTripChange} aria-labelledby="round-trip-label" />
+      </div>
+      {routeError ? <p className="stop-error">{routeError}</p> : null}
+      <Button
+        className="toolbar-action"
+        block
+        color="green"
+        variant="solid"
+        icon={<CarOutlined />}
+        disabled={stops.length < 2 || building}
+        loading={building}
+        onClick={onBuildRoute}
+      >
         Build route
       </Button>
     </aside>

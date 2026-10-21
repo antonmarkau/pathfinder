@@ -3,6 +3,7 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { optimizeRoute } from './optimize.js';
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(serverDir, '../..');
@@ -12,6 +13,8 @@ dotenv.config({ path: path.join(repoRoot, '.env') });
 const app = express();
 const port = Number(process.env.PORT) || 3000;
 const clientDist = path.join(repoRoot, 'client', 'dist');
+
+app.use(express.json());
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
@@ -25,6 +28,10 @@ app.get('/api/mapbox-token', (_req, res) => {
   }
   res.set('Cache-Control', 'no-store');
   res.json({ token });
+});
+
+app.post('/api/optimize', (req, res) => {
+  void optimizeRoute(req, res);
 });
 
 if (existsSync(clientDist)) {

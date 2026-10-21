@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ConfigProvider } from 'antd';
 import { labelForPoint, type MapCenter } from './geocoding';
 import { MapView } from './MapView';
+import { isRouteResult, loadRoundTrip, orderStops, saveRoundTrip, type RouteGeometry } from './route';
 import { StopsToolbar } from './StopsToolbar';
 import { loadStops, MAX_STOPS, saveStops, type Stop } from './stops';
 
@@ -12,11 +13,20 @@ export function App() {
   const [stops, setStops] = useState<Stop[]>(loadStops);
   const [proximity, setProximity] = useState<MapCenter>(MINSK);
   const [selecting, setSelecting] = useState(false);
+  const [roundTrip, setRoundTrip] = useState(loadRoundTrip);
+  const [route, setRoute] = useState<RouteGeometry | null>(null);
+  const [building, setBuilding] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
   const dragTicket = useRef(new Map<string, number>());
+  const routeRequest = useRef(0);
 
   useEffect(() => {
     saveStops(stops);
   }, [stops]);
+
+  useEffect(() => {
+    saveRoundTrip(roundTrip);
+  }, [roundTrip]);
 
   useEffect(() => {
     if (stops.length >= MAX_STOPS) {
@@ -36,7 +46,7 @@ export function App() {
       longitude: center.longitude,
       latitude: center.latitude,
     };
-    setStops((current) => (current.length >= MAX_STOPS ? current : [...current, stop]));
+    updateStops((current) => (current.length >= MAX_STOPS ? current : [...current, stop]));
   }
 
   async function moveStop(id: string, center: MapCenter) {
@@ -49,13 +59,76 @@ export function App() {
     if (dragTicket.current.get(id) !== ticket) {
       return;
     }
-    setStops((current) =>
+    updateStops((current) =>
       current.map((stop) =>
         stop.id === id
           ? { ...stop, label, longitude: center.longitude, latitude: center.latitude }
           : stop,
       ),
     );
+  }
+
+  function replaceStops(next: Stop[]) {
+    clearRoute();
+    setStops(next);
+  }
+
+  function updateStops(updater: (current: Stop[]) => Stop[]) {
+    clearRoute();
+    setStops(updater);
+  }
+
+  function changeRoundTrip(next: boolean) {
+    clearRoute();
+    setRoundTrip(next);
+  }
+
+  function clearRoute() {
+    routeRequest.current += 1;
+    setBuilding(false);
+    setRoute(null);
+    setRouteError(null);
+  }
+
+  async function buildRoute() {
+    if (stops.length < 2 || stops.length > MAX_STOPS || building) {
+      return;
+    }
+    const ticket = ++routeRequest.current;
+    const snapshot = stops;
+    setBuilding(true);
+    setRouteError(null);
+    try {
+      const response = await fetch('/api/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roundTrip,
+          stops: snapshot.map(({ id, longitude, latitude }) => ({ id, longitude, latitude })),
+        }),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      if (ticket !== routeRequest.current) {
+        return;
+      }
+      const ordered = isRouteResult(body) ? orderStops(snapshot, body.order) : null;
+      if (!response.ok || !isRouteResult(body) || !ordered) {
+        setRoute(null);
+        setRouteError('The route could not be built');
+        return;
+      }
+      setStops(ordered);
+      setRoute(body.geometry);
+    } catch {
+      if (ticket === routeRequest.current) {
+        setRoute(null);
+        setRouteError('The route could not be built');
+      }
+    } finally {
+      if (ticket === routeRequest.current) {
+        setBuilding(false);
+      }
+    }
   }
 
   return (
@@ -78,6 +151,7 @@ export function App() {
             stops={stops}
             selecting={selecting}
             onProximityChange={setProximity}
+            route={route}
             onMapClick={(center) => void addStopFromMap(center)}
             onStopDrag={(id, center) => void moveStop(id, center)}
           />
@@ -86,8 +160,13 @@ export function App() {
             stops={stops}
             proximity={proximity}
             selecting={selecting}
+            roundTrip={roundTrip}
+            building={building}
+            routeError={routeError}
             onSelectingChange={setSelecting}
-            onStopsChange={setStops}
+            onRoundTripChange={changeRoundTrip}
+            onBuildRoute={() => void buildRoute()}
+            onStopsChange={replaceStops}
           />
         </main>
       </div>

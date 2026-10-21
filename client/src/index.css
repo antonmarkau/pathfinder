@@ -141,6 +141,15 @@ body,
   margin-top: 8px;
 }
 
+.round-trip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  color: #1c2b33;
+  font-size: 14px;
+}
+
 .stop-marker {
   display: flex;
   align-items: center;

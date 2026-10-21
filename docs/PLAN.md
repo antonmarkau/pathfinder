@@ -14,10 +14,10 @@ Do the next unchecked step only. Mark it done in this file as part of that chang
 - Routing uses the Mapbox Optimization API with profile `mapbox/driving`.
 - The toolbar has a round-trip / one-way toggle.
   - Round trip: `roundtrip=true`. The route returns to its start. Mapbox chooses which stop is the start of the loop.
-  - One-way: `roundtrip=false`, `source=any`, `destination=any`. Mapbox chooses the best start and end.
+  - One-way: the shortest open drive. Mapbox does not implement `source=any` with `destination=any`, so the server tries each start and end with `source=first` and `destination=last` and keeps the shortest trip.
 - A stop is `{ id, label, longitude, latitude }`. Only a geocoded place becomes a stop.
 - Ant Design is for the toolbar. The map stays Mapbox GL.
-- Toolbar order: saved stops, at most one draft search row, a full-width grey Plus button, then a full-width green Build route button with a car icon. Build route stays disabled until step 5.
+- Toolbar order: saved stops, at most one draft search row, a full-width grey Plus button, Select on map, a round-trip switch, then a full-width green Build route button with a car icon. Build route is enabled for 2–12 stops.
 - Plus opens the draft and is disabled while a draft or an edit is open, and when 12 stops are saved.
 - The draft row has a blue checkmark Confirm button on the left and a Mapbox autocomplete on the right. Confirm stays disabled until the user picks a suggestion or enters `latitude, longitude` (placeholder `53.9006, 27.559`).
 - A saved row shows a truncated label, a yellow pencil Edit button, and a red trash Delete button. Markers on the map use the same list order, starting at 1.
@@ -25,6 +25,7 @@ Do the next unchecked step only. Mark it done in this file as part of that chang
 - Search calls the Mapbox Geocoding API, debounced, with at most five results. Proximity is the current map center. The language follows the browser. A coordinate pair is reverse-geocoded for its label.
 - Select on map is a toolbar mode. The next map click is reverse-geocoded and appended. The mode ends after that click, or when the button is pressed again. It is disabled at 12 stops.
 - Markers are draggable. Dropping a marker reverse-geocodes the new point and updates that stop's label and coordinates in the list and on the map.
+- Build route calls `POST /api/optimize`, reorders the stops into visit order, and draws that driving line. Adding, editing, deleting, or dragging a stop, or switching round trip, clears the line until Build route is pressed again.
 
 ## Runtime
 
@@ -59,5 +60,5 @@ Response: visit order as stop ids, plus the route as a GeoJSON `LineString`. Rej
 - [x] 2. Map. Serve the token from the server, create the Mapbox map, ask for location, and fall back to Minsk.
 - [x] 3. Stops. Ant Design toolbar: add, edit, and remove up to twelve addresses. Geocode with Mapbox. Show numbered markers. Persist the list. Show Build route disabled.
 - [x] 4. Select on map. A toolbar mode: the next click is reverse-geocoded and appended as a stop. Dragging a marker updates that stop in the list and on the map.
-- [ ] 5. Optimize. Round-trip switch above Build route. Enable that button for 2–12 stops. `POST /api/optimize` draws the route and renumbers markers in visit order. Adding, editing, or deleting a stop clears the line until Build route is pressed again.
+- [x] 5. Optimize. Round-trip switch above Build route. Enable that button for 2–12 stops. `POST /api/optimize` draws the route and renumbers markers in visit order. Adding, editing, or deleting a stop clears the line until Build route is pressed again.
 - [ ] 6. Render. Deploy the image, set the token, and confirm `/health` and the map on the public URL.
