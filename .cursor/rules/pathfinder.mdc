@@ -1,0 +1,15 @@
+---
+description: Pathfinder constraints and the order of work in docs/PLAN.md
+alwaysApply: true
+---
+
+# Pathfinder
+
+Read `docs/PLAN.md` before implementing. Do the next unchecked step only, then mark that step done in the same change.
+
+- TypeScript, React, and Node. One Render web service from the root Dockerfile. Listen on `0.0.0.0` and `process.env.PORT`. `GET /health` stays available.
+- One secret: `MAPBOX_ACCESS_TOKEN` in the repo-root `.env` (gitignored). The server reads it at runtime. The browser fetches the public token from the server. Do not add a second token variable, and do not log the token.
+- No accounts. Stops and the round-trip toggle persist in `localStorage`.
+- Mapbox Optimization API, profile `mapbox/driving`, 2–12 stops. Round trip is a toolbar toggle (`roundtrip=true`, or `roundtrip=false` with `source=any` and `destination=any`).
+- On load, ask for the browser location. If denied or unavailable, center the map on Minsk (longitude 27.559, latitude 53.9006).
+- Desktop first. Keep the header, upper-left toolbar, and map as separate regions so a later mobile layout can stack them.

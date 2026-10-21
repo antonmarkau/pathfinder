@@ -1,0 +1,93 @@
+:root {
+  color: #1c2b33;
+  background: #e7eef2;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  line-height: 1.4;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 20px;
+  background: #14323f;
+  color: #f4f7f8;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  background-color: #d5e1e8;
+  background-image:
+    linear-gradient(rgba(20, 50, 63, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20, 50, 63, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.map-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  color: #5d7280;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: translate(-50%, -50%);
+}
+
+.toolbar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 1;
+  width: min(22rem, calc(100% - 32px));
+  padding: 16px 16px 18px;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(20, 50, 63, 0.16);
+}
+
+.toolbar h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.toolbar p {
+  margin: 0;
+  color: #5c6e78;
+  font-size: 14px;
+}
