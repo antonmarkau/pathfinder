@@ -16,6 +16,13 @@ Do the next unchecked step only. Mark it done in this file as part of that chang
   - Round trip: `roundtrip=true`. The route returns to its start. Mapbox chooses which stop is the start of the loop.
   - One-way: `roundtrip=false`, `source=any`, `destination=any`. Mapbox chooses the best start and end.
 - A stop is `{ id, label, longitude, latitude }`. Only a geocoded place becomes a stop.
+- Ant Design is for the toolbar. The map stays Mapbox GL.
+- Toolbar order: saved stops, at most one draft search row, a full-width grey Plus button, then a full-width green Build route button with a car icon. Build route stays disabled until step 5.
+- Plus opens the draft and is disabled while a draft or an edit is open, and when 12 stops are saved.
+- The draft row has a blue checkmark Confirm button on the left and a Mapbox autocomplete on the right. Confirm stays disabled until the user picks a suggestion or enters `latitude, longitude` (placeholder `53.9006, 27.559`).
+- A saved row shows a truncated label, a yellow pencil Edit button, and a red trash Delete button. Markers on the map use the same list order, starting at 1.
+- Edit turns that row back into search filled with the current name. The marker stays until Confirm replaces it. Pressing Edit again, or clearing the field, cancels.
+- Search calls the Mapbox Geocoding API, debounced, with at most five results. Proximity is the current map center. The language follows the browser. A coordinate pair is reverse-geocoded for its label.
 
 ## Runtime
 
@@ -48,7 +55,7 @@ Response: visit order as stop ids, plus the route as a GeoJSON `LineString`. Rej
 
 - [x] 1. Scaffold. Workspaces, header / toolbar / map shell, `GET /health`, Dockerfile, Compose, `.env.example`, `.gitignore`, this plan, and `docs/local-development.md`. `docker compose up --build` serves the shell on port 3000.
 - [x] 2. Map. Serve the token from the server, create the Mapbox map, ask for location, and fall back to Minsk.
-- [ ] 3. Stops. Add, edit, and remove up to twelve addresses. Geocode with Mapbox. Show markers. Persist the list.
+- [x] 3. Stops. Ant Design toolbar: add, edit, and remove up to twelve addresses. Geocode with Mapbox. Show numbered markers. Persist the list. Show Build route disabled.
 - [ ] 4. Select on map. A toolbar mode: the next click is reverse-geocoded and appended as a stop.
-- [ ] 5. Optimize. Round-trip toggle, `POST /api/optimize`, draw the route, and renumber markers in visit order.
+- [ ] 5. Optimize. Round-trip switch above Build route. Enable that button for 2–12 stops. `POST /api/optimize` draws the route and renumbers markers in visit order. Adding, editing, or deleting a stop clears the line until Build route is pressed again.
 - [ ] 6. Render. Deploy the image, set the token, and confirm `/health` and the map on the public URL.
