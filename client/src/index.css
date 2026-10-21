@@ -152,5 +152,15 @@ body,
   background: #14323f;
   box-shadow: 0 2px 6px rgba(20, 50, 63, 0.35);
   color: #f4f7f8;
+  cursor: grab;
   font: 650 13px/1 "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+.stop-marker:active {
+  cursor: grabbing;
+}
+
+.map.selecting .mapboxgl-canvas-container.mapboxgl-interactive,
+.map.selecting .mapboxgl-canvas-container.mapboxgl-interactive:active {
+  cursor: crosshair;
 }

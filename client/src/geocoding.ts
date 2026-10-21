@@ -46,6 +46,16 @@ export async function forwardGeocode(
   return readPlaces(await response.json());
 }
 
+export async function labelForPoint(
+  longitude: number,
+  latitude: number,
+  token: string,
+  signal: AbortSignal,
+): Promise<string> {
+  const label = await reverseGeocode(longitude, latitude, token, signal);
+  return label ?? `${latitude}, ${longitude}`;
+}
+
 export async function reverseGeocode(
   longitude: number,
   latitude: number,

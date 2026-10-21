@@ -14,12 +14,28 @@ type MapViewProps = {
   token: string | null;
   error: boolean;
   stops: Stop[];
+  selecting: boolean;
   onProximityChange: (center: MapCenter) => void;
+  onMapClick: (center: MapCenter) => void;
+  onStopDrag: (id: string, center: MapCenter) => void;
 };
 
-export function MapView({ token, error, stops, onProximityChange }: MapViewProps) {
+export function MapView({
+  token,
+  error,
+  stops,
+  selecting,
+  onProximityChange,
+  onMapClick,
+  onStopDrag,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onProximityChangeRef = useRef(onProximityChange);
+  const onMapClickRef = useRef(onMapClick);
+  const onStopDragRef = useRef(onStopDrag);
+  const selectingRef = useRef(selecting);
+  const suppressClickUntil = useRef(0);
+  const draggedIds = useRef(new Set<string>());
   const skipNextFly = useRef(true);
   const previousStops = useRef<Stop[]>([]);
   const [map, setMap] = useState<mapboxgl.Map | null>(null);
@@ -28,7 +44,10 @@ export function MapView({ token, error, stops, onProximityChange }: MapViewProps
 
   useEffect(() => {
     onProximityChangeRef.current = onProximityChange;
-  }, [onProximityChange]);
+    onMapClickRef.current = onMapClick;
+    onStopDragRef.current = onStopDrag;
+    selectingRef.current = selecting;
+  }, [onMapClick, onProximityChange, onStopDrag, selecting]);
 
   useEffect(() => {
     if (error) {
@@ -74,6 +93,16 @@ export function MapView({ token, error, stops, onProximityChange }: MapViewProps
       publishCenter();
     });
     mapInstance.on('moveend', publishCenter);
+    mapInstance.on('click', (event) => {
+      if (performance.now() < suppressClickUntil.current || !selectingRef.current) {
+        return;
+      }
+      const target = event.originalEvent.target;
+      if (target instanceof Element && target.closest('.mapboxgl-ctrl, .stop-marker')) {
+        return;
+      }
+      onMapClickRef.current({ longitude: event.lngLat.lng, latitude: event.lngLat.lat });
+    });
     mapInstance.on('error', () => {
       if (!loaded && !cancelled) {
         setStatus('error');
@@ -98,26 +127,37 @@ export function MapView({ token, error, stops, onProximityChange }: MapViewProps
       const element = document.createElement('div');
       element.className = 'stop-marker';
       element.textContent = String(index + 1);
-      return new mapboxgl.Marker({ element, anchor: 'center' })
+      element.setAttribute('role', 'button');
+      element.setAttribute('aria-label', `Drag stop ${index + 1}`);
+      const marker = new mapboxgl.Marker({ element, anchor: 'center', draggable: true })
         .setLngLat([stop.longitude, stop.latitude])
         .addTo(map);
+      marker.on('dragend', () => {
+        suppressClickUntil.current = performance.now() + 300;
+        draggedIds.current.add(stop.id);
+        const lngLat = marker.getLngLat();
+        onStopDragRef.current(stop.id, { longitude: lngLat.lng, latitude: lngLat.lat });
+      });
+      return marker;
     });
 
     const previous = previousStops.current;
     previousStops.current = stops;
+    const changed = stops.find((stop) => {
+      const before = previous.find((item) => item.id === stop.id);
+      return !before || before.longitude !== stop.longitude || before.latitude !== stop.latitude;
+    });
+    const dragged = changed !== undefined && draggedIds.current.has(changed.id);
+    if (dragged && changed) {
+      draggedIds.current.delete(changed.id);
+    }
     if (skipNextFly.current) {
       skipNextFly.current = false;
-    } else {
-      const changed = stops.find((stop) => {
-        const before = previous.find((item) => item.id === stop.id);
-        return !before || before.longitude !== stop.longitude || before.latitude !== stop.latitude;
+    } else if (changed && !dragged) {
+      map.flyTo({
+        center: [changed.longitude, changed.latitude],
+        zoom: Math.max(map.getZoom(), USER_ZOOM),
       });
-      if (changed) {
-        map.flyTo({
-          center: [changed.longitude, changed.latitude],
-          zoom: Math.max(map.getZoom(), USER_ZOOM),
-        });
-      }
     }
 
     return () => {
@@ -126,7 +166,7 @@ export function MapView({ token, error, stops, onProximityChange }: MapViewProps
   }, [map, stops]);
 
   return (
-    <section className="map" aria-label="Map">
+    <section className={selecting ? 'map selecting' : 'map'} aria-label="Map">
       <div ref={containerRef} className="map-canvas" />
       {status !== 'ready' ? <p className="map-label">{message}</p> : null}
     </section>

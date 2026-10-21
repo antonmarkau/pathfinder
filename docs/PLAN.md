@@ -23,6 +23,8 @@ Do the next unchecked step only. Mark it done in this file as part of that chang
 - A saved row shows a truncated label, a yellow pencil Edit button, and a red trash Delete button. Markers on the map use the same list order, starting at 1.
 - Edit turns that row back into search filled with the current name. The marker stays until Confirm replaces it. Pressing Edit again, or clearing the field, cancels.
 - Search calls the Mapbox Geocoding API, debounced, with at most five results. Proximity is the current map center. The language follows the browser. A coordinate pair is reverse-geocoded for its label.
+- Select on map is a toolbar mode. The next map click is reverse-geocoded and appended. The mode ends after that click, or when the button is pressed again. It is disabled at 12 stops.
+- Markers are draggable. Dropping a marker reverse-geocodes the new point and updates that stop's label and coordinates in the list and on the map.
 
 ## Runtime
 
@@ -56,6 +58,6 @@ Response: visit order as stop ids, plus the route as a GeoJSON `LineString`. Rej
 - [x] 1. Scaffold. Workspaces, header / toolbar / map shell, `GET /health`, Dockerfile, Compose, `.env.example`, `.gitignore`, this plan, and `docs/local-development.md`. `docker compose up --build` serves the shell on port 3000.
 - [x] 2. Map. Serve the token from the server, create the Mapbox map, ask for location, and fall back to Minsk.
 - [x] 3. Stops. Ant Design toolbar: add, edit, and remove up to twelve addresses. Geocode with Mapbox. Show numbered markers. Persist the list. Show Build route disabled.
-- [ ] 4. Select on map. A toolbar mode: the next click is reverse-geocoded and appended as a stop.
+- [x] 4. Select on map. A toolbar mode: the next click is reverse-geocoded and appended as a stop. Dragging a marker updates that stop in the list and on the map.
 - [ ] 5. Optimize. Round-trip switch above Build route. Enable that button for 2–12 stops. `POST /api/optimize` draws the route and renumbers markers in visit order. Adding, editing, or deleting a stop clears the line until Build route is pressed again.
 - [ ] 6. Render. Deploy the image, set the token, and confirm `/health` and the map on the public URL.

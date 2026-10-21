@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AutoComplete, Button } from 'antd';
-import { CarOutlined, CheckOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { AimOutlined, CarOutlined, CheckOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { forwardGeocode, parseLatLng, reverseGeocode, type GeocodedPlace, type MapCenter } from './geocoding';
 import { MAX_STOPS, type Stop } from './stops';
 
@@ -10,10 +10,19 @@ type StopsToolbarProps = {
   token: string | null;
   stops: Stop[];
   proximity: MapCenter;
+  selecting: boolean;
+  onSelectingChange: (selecting: boolean) => void;
   onStopsChange: (stops: Stop[]) => void;
 };
 
-export function StopsToolbar({ token, stops, proximity, onStopsChange }: StopsToolbarProps) {
+export function StopsToolbar({
+  token,
+  stops,
+  proximity,
+  selecting,
+  onSelectingChange,
+  onStopsChange,
+}: StopsToolbarProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<GeocodedPlace | null>(null);
@@ -24,6 +33,19 @@ export function StopsToolbar({ token, stops, proximity, onStopsChange }: StopsTo
   const coordinates = parseLatLng(query);
   const canConfirm = selected !== null || coordinates !== null;
   const draftOpen = draft !== null;
+
+  useEffect(() => {
+    if (draft?.mode !== 'edit' || !selected) {
+      return;
+    }
+    const stop = stops.find((item) => item.id === draft.stopId);
+    if (!stop) {
+      return;
+    }
+    if (stop.longitude !== selected.longitude || stop.latitude !== selected.latitude) {
+      closeDraft();
+    }
+  }, [draft, selected, stops]);
 
   useEffect(() => {
     if (!token || !draftOpen || parseLatLng(query) || query.trim().length < 2 || selected?.label === query) {
@@ -197,6 +219,17 @@ export function StopsToolbar({ token, stops, proximity, onStopsChange }: StopsTo
         disabled={!token || stops.length >= MAX_STOPS || draftOpen}
         onClick={openAdd}
       />
+      <Button
+        className="toolbar-action"
+        block
+        type={selecting ? 'primary' : 'default'}
+        icon={<AimOutlined />}
+        aria-pressed={selecting}
+        disabled={!token || stops.length >= MAX_STOPS}
+        onClick={() => onSelectingChange(!selecting)}
+      >
+        {selecting ? 'Click the map' : 'Select on map'}
+      </Button>
       <Button className="toolbar-action" block disabled color="green" variant="solid" icon={<CarOutlined />}>
         Build route
       </Button>
