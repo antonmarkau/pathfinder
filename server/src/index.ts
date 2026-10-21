@@ -17,6 +17,16 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+app.get('/api/mapbox-token', (_req, res) => {
+  const token = process.env.MAPBOX_ACCESS_TOKEN?.trim();
+  if (!token?.startsWith('pk.')) {
+    res.status(503).json({ error: 'Set MAPBOX_ACCESS_TOKEN to a public pk. token' });
+    return;
+  }
+  res.set('Cache-Control', 'no-store');
+  res.json({ token });
+});
+
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
   app.use((req, res, next) => {

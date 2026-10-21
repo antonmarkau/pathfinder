@@ -5,7 +5,7 @@ Pathfinder runs as one container. The image builds the React app, then the Node 
 ## Prerequisites
 
 - Docker Desktop (Compose v2, so the command is `docker compose`)
-- A Mapbox public token is not required for the shell. Copy the env file anyway so later steps can read it.
+- The map reads `MAPBOX_ACCESS_TOKEN` from `.env`. Copy the example file and set your public token before starting.
 
 From the repository root in PowerShell:
 
@@ -13,7 +13,7 @@ From the repository root in PowerShell:
 Copy-Item .env.example .env
 ```
 
-Open `.env` and set `MAPBOX_ACCESS_TOKEN` to your Mapbox public token (`pk.…`) when you have it. Leave it empty until then.
+Open `.env` and set `MAPBOX_ACCESS_TOKEN` to your Mapbox public token (`pk.…`). Restart the container after changing it.
 
 ## Start
 

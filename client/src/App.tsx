@@ -1,3 +1,5 @@
+import { MapView } from './MapView';
+
 export function App() {
   return (
     <div className="app">
@@ -5,9 +7,7 @@ export function App() {
         <h1>Pathfinder</h1>
       </header>
       <main className="stage">
-        <section className="map" aria-label="Map">
-          <p className="map-label">Map</p>
-        </section>
+        <MapView />
         <aside className="toolbar" aria-label="Stops">
           <h2>Stops</h2>
           <p>Addresses you add will be listed here.</p>

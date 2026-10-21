@@ -34,6 +34,8 @@ docs/       This plan and local run instructions
 
 ## API
 
+`GET /api/mapbox-token` returns `{ "token": "pk.…" }`. It responds with 503 when the public token is missing.
+
 `POST /api/optimize`
 
 ```json
@@ -45,7 +47,7 @@ Response: visit order as stop ids, plus the route as a GeoJSON `LineString`. Rej
 ## Steps
 
 - [x] 1. Scaffold. Workspaces, header / toolbar / map shell, `GET /health`, Dockerfile, Compose, `.env.example`, `.gitignore`, this plan, and `docs/local-development.md`. `docker compose up --build` serves the shell on port 3000.
-- [ ] 2. Map. Serve the token from the server, create the Mapbox map, ask for location, and fall back to Minsk.
+- [x] 2. Map. Serve the token from the server, create the Mapbox map, ask for location, and fall back to Minsk.
 - [ ] 3. Stops. Add, edit, and remove up to twelve addresses. Geocode with Mapbox. Show markers. Persist the list.
 - [ ] 4. Select on map. A toolbar mode: the next click is reverse-geocoded and appended as a stop.
 - [ ] 5. Optimize. Round-trip toggle, `POST /api/optimize`, draw the route, and renumber markers in visit order.
