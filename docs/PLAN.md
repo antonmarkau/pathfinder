@@ -25,7 +25,7 @@ Do the next unchecked step only. Mark it done in this file as part of that chang
 - Search calls the Mapbox Geocoding API, debounced, with at most five results. Proximity is the current map center. The language follows the browser. A coordinate pair is reverse-geocoded for its label.
 - Select on map is a toolbar mode. The next map click is reverse-geocoded and appended. The mode ends after that click, or when the button is pressed again. It is disabled at 12 stops.
 - Markers are draggable. Dropping a marker reverse-geocodes the new point and updates that stop's label and coordinates in the list and on the map.
-- Build route calls `POST /api/optimize`, reorders the stops into visit order, and draws that driving line. Adding, editing, deleting, or dragging a stop, or switching round trip, clears the line until Build route is pressed again.
+- Build route calls `POST /api/optimize`, reorders the stops into visit order, and draws each hop in its own color. The hop and the marker it leads to share a color. A one-way start has no incoming hop, so that marker stays neutral. Adding, editing, deleting, or dragging a stop, or switching round trip, clears the line until Build route is pressed again.
 
 ## Runtime
 
@@ -52,7 +52,7 @@ docs/       This plan and local run instructions
 { "stops": [{ "id": "string", "longitude": 0, "latitude": 0 }], "roundTrip": true }
 ```
 
-Response: visit order as stop ids, plus the route as a GeoJSON `LineString`. Reject fewer than 2 or more than 12 stops.
+Response: visit order as stop ids, plus one GeoJSON `LineString` per hop. The line for a hop is the step geometries of that leg joined in order. Reject fewer than 2 or more than 12 stops.
 
 ## Steps
 
@@ -61,4 +61,5 @@ Response: visit order as stop ids, plus the route as a GeoJSON `LineString`. Rej
 - [x] 3. Stops. Ant Design toolbar: add, edit, and remove up to twelve addresses. Geocode with Mapbox. Show numbered markers. Persist the list. Show Build route disabled.
 - [x] 4. Select on map. A toolbar mode: the next click is reverse-geocoded and appended as a stop. Dragging a marker updates that stop in the list and on the map.
 - [x] 5. Optimize. Round-trip switch above Build route. Enable that button for 2–12 stops. `POST /api/optimize` draws the route and renumbers markers in visit order. Adding, editing, or deleting a stop clears the line until Build route is pressed again.
-- [ ] 6. Render. Deploy the image, set the token, and confirm `/health` and the map on the public URL.
+- [x] 6. Colored hops. Request the step geometry, join the steps of each leg into one line, and paint that line and the marker it leads to with the same color.
+- [ ] 7. Render. Deploy the image, set the token, and confirm `/health` and the map on the public URL.

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AutoComplete, Button, Switch } from 'antd';
 import { AimOutlined, CarOutlined, CheckOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { forwardGeocode, parseLatLng, reverseGeocode, type GeocodedPlace, type MapCenter } from './geocoding';
+import { stopColor } from './route';
 import { MAX_STOPS, type Stop } from './stops';
 
 type Draft = { mode: 'add' } | { mode: 'edit'; stopId: string };
@@ -14,6 +15,7 @@ type StopsToolbarProps = {
   roundTrip: boolean;
   building: boolean;
   routeError: string | null;
+  routeActive: boolean;
   onSelectingChange: (selecting: boolean) => void;
   onRoundTripChange: (roundTrip: boolean) => void;
   onBuildRoute: () => void;
@@ -28,6 +30,7 @@ export function StopsToolbar({
   roundTrip,
   building,
   routeError,
+  routeActive,
   onSelectingChange,
   onRoundTripChange,
   onBuildRoute,
@@ -196,10 +199,12 @@ export function StopsToolbar({
       <ul className="stop-list">
         {stops.map((stop, index) =>
           draft?.mode === 'edit' && draft.stopId === stop.id ? (
-            <li key={stop.id}>{renderDraft(`${index + 1}`)}</li>
+            <li key={stop.id}>{renderDraft(`${index + 1}`, index)}</li>
           ) : (
             <li key={stop.id} className="stop-row">
-              <span className="stop-index">{index + 1}</span>
+              <span className="stop-index" style={indexStyle(index)}>
+                {index + 1}
+              </span>
               <span className="stop-label" title={stop.label}>
                 {stop.label}
               </span>
@@ -260,11 +265,18 @@ export function StopsToolbar({
     </aside>
   );
 
-  function renderDraft(indexLabel: string) {
+  function indexStyle(index: number): { color: string; fontWeight: number } | undefined {
+    const color = stopColor(index, roundTrip, routeActive);
+    return color ? { color, fontWeight: 650 } : undefined;
+  }
+
+  function renderDraft(indexLabel: string, index?: number) {
     return (
       <>
         <div className="stop-row">
-          <span className="stop-index">{indexLabel}</span>
+          <span className="stop-index" style={index === undefined ? undefined : indexStyle(index)}>
+            {indexLabel}
+          </span>
           <Button
             type="primary"
             icon={<CheckOutlined />}

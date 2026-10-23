@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { MapCenter } from './geocoding';
-import type { RouteGeometry } from './route';
+import { legColor, stopColor, type RouteGeometry } from './route';
 import type { Stop } from './stops';
 
 const MINSK: mapboxgl.LngLatLike = [27.559, 53.9006];
@@ -16,7 +16,8 @@ type MapViewProps = {
   error: boolean;
   stops: Stop[];
   selecting: boolean;
-  route: RouteGeometry | null;
+  route: RouteGeometry[] | null;
+  roundTrip: boolean;
   onProximityChange: (center: MapCenter) => void;
   onMapClick: (center: MapCenter) => void;
   onStopDrag: (id: string, center: MapCenter) => void;
@@ -28,6 +29,7 @@ export function MapView({
   stops,
   selecting,
   route,
+  roundTrip,
   onProximityChange,
   onMapClick,
   onStopDrag,
@@ -130,6 +132,10 @@ export function MapView({
       const element = document.createElement('div');
       element.className = 'stop-marker';
       element.textContent = String(index + 1);
+      const color = stopColor(index, roundTrip, route !== null);
+      if (color) {
+        element.style.background = color;
+      }
       element.setAttribute('role', 'button');
       element.setAttribute('aria-label', `Drag stop ${index + 1}`);
       const marker = new mapboxgl.Marker({ element, anchor: 'center', draggable: true })
@@ -166,18 +172,20 @@ export function MapView({
     return () => {
       markers.forEach((marker) => marker.remove());
     };
-  }, [map, stops]);
+  }, [map, route, roundTrip, stops]);
 
   useEffect(() => {
     if (!map) {
       return;
     }
 
-    const geometry: RouteGeometry = route ?? { type: 'LineString', coordinates: [] };
     const data = {
-      type: 'Feature' as const,
-      properties: {},
-      geometry,
+      type: 'FeatureCollection' as const,
+      features: (route ?? []).map((leg, index) => ({
+        type: 'Feature' as const,
+        properties: { color: legColor(index, stops.length, roundTrip) },
+        geometry: leg,
+      })),
     };
     const existing = map.getSource('route');
     if (existing?.type === 'geojson') {
@@ -196,14 +204,16 @@ export function MapView({
         type: 'line',
         source: 'route',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#1d6fbf', 'line-width': 5 },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 5 },
       });
     }
 
-    if (route && route.coordinates.length > 1) {
+    if (route && route.length > 0) {
       const bounds = new mapboxgl.LngLatBounds();
-      for (const coordinate of route.coordinates) {
-        bounds.extend(coordinate);
+      for (const leg of route) {
+        for (const coordinate of leg.coordinates) {
+          bounds.extend(coordinate);
+        }
       }
       map.fitBounds(bounds, { padding: 72, maxZoom: 14, duration: 700 });
     }
@@ -222,7 +232,7 @@ export function MapView({
         map.removeSource('route');
       }
     };
-  }, [map, route]);
+  }, [map, route, roundTrip, stops.length]);
 
   return (
     <section className={selecting ? 'map selecting' : 'map'} aria-label="Map">

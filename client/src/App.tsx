@@ -14,7 +14,7 @@ export function App() {
   const [proximity, setProximity] = useState<MapCenter>(MINSK);
   const [selecting, setSelecting] = useState(false);
   const [roundTrip, setRoundTrip] = useState(loadRoundTrip);
-  const [route, setRoute] = useState<RouteGeometry | null>(null);
+  const [route, setRoute] = useState<RouteGeometry[] | null>(null);
   const [building, setBuilding] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const dragTicket = useRef(new Map<string, number>());
@@ -111,14 +111,15 @@ export function App() {
       if (ticket !== routeRequest.current) {
         return;
       }
+      const expectedLegs = roundTrip ? snapshot.length : snapshot.length - 1;
       const ordered = isRouteResult(body) ? orderStops(snapshot, body.order) : null;
-      if (!response.ok || !isRouteResult(body) || !ordered) {
+      if (!response.ok || !isRouteResult(body) || !ordered || body.legs.length !== expectedLegs) {
         setRoute(null);
         setRouteError('The route could not be built');
         return;
       }
       setStops(ordered);
-      setRoute(body.geometry);
+      setRoute(body.legs);
     } catch {
       if (ticket === routeRequest.current) {
         setRoute(null);
@@ -152,6 +153,7 @@ export function App() {
             selecting={selecting}
             onProximityChange={setProximity}
             route={route}
+            roundTrip={roundTrip}
             onMapClick={(center) => void addStopFromMap(center)}
             onStopDrag={(id, center) => void moveStop(id, center)}
           />
@@ -163,6 +165,7 @@ export function App() {
             roundTrip={roundTrip}
             building={building}
             routeError={routeError}
+            routeActive={route !== null}
             onSelectingChange={setSelecting}
             onRoundTripChange={changeRoundTrip}
             onBuildRoute={() => void buildRoute()}

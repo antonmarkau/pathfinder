@@ -9,8 +9,38 @@ export type RouteGeometry = {
 
 export type RouteResult = {
   order: string[];
-  geometry: RouteGeometry;
+  legs: RouteGeometry[];
 };
+
+export const STOP_COLORS = [
+  '#B91C1C',
+  '#1D4ED8',
+  '#4D7C0F',
+  '#C2410C',
+  '#7E22CE',
+  '#0E7490',
+  '#A16207',
+  '#A21CAF',
+  '#047857',
+  '#4338CA',
+  '#9D174D',
+  '#7C2D12',
+];
+
+export function legDestinationIndex(legIndex: number, stopCount: number, roundTrip: boolean): number {
+  return roundTrip ? (legIndex + 1) % stopCount : legIndex + 1;
+}
+
+export function legColor(legIndex: number, stopCount: number, roundTrip: boolean): string {
+  return STOP_COLORS[legDestinationIndex(legIndex, stopCount, roundTrip)];
+}
+
+export function stopColor(index: number, roundTrip: boolean, routeActive: boolean): string | null {
+  if (!routeActive || (!roundTrip && index === 0)) {
+    return null;
+  }
+  return STOP_COLORS[index] ?? null;
+}
 
 export function loadRoundTrip(): boolean {
   return localStorage.getItem(ROUND_TRIP_STORAGE_KEY) !== 'false';
@@ -44,11 +74,14 @@ export function isRouteResult(value: unknown): value is RouteResult {
   if (!Array.isArray(record.order) || !record.order.every((id) => typeof id === 'string')) {
     return false;
   }
-  const geometry = record.geometry;
-  if (typeof geometry !== 'object' || geometry === null) {
+  return Array.isArray(record.legs) && record.legs.length > 0 && record.legs.every(isLineString);
+}
+
+function isLineString(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) {
     return false;
   }
-  const line = geometry as Record<string, unknown>;
+  const line = value as Record<string, unknown>;
   if (line.type !== 'LineString' || !Array.isArray(line.coordinates) || line.coordinates.length < 2) {
     return false;
   }

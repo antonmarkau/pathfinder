@@ -78,7 +78,7 @@ async function requestTrip(
   if (!response.ok) {
     return null;
   }
-  return readTrip(await response.json(), stops);
+  return readTrip(await response.json(), stops, roundTrip);
 }
 
 async function mapPool<T, R>(items: T[], limit: number, worker: (item: T) => Promise<R>): Promise<R[]> {
@@ -98,7 +98,7 @@ async function mapPool<T, R>(items: T[], limit: number, worker: (item: T) => Pro
 
 type RouteResult = {
   order: string[];
-  geometry: RouteGeometry;
+  legs: RouteGeometry[];
 };
 
 function optimizationUrl(stops: OptimizeStop[], roundTrip: boolean, token: string): URL {
@@ -106,6 +106,7 @@ function optimizationUrl(stops: OptimizeStop[], roundTrip: boolean, token: strin
   const url = new URL(`https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${coordinates}`);
   url.searchParams.set('geometries', 'geojson');
   url.searchParams.set('overview', 'full');
+  url.searchParams.set('steps', 'true');
   url.searchParams.set('roundtrip', roundTrip ? 'true' : 'false');
   if (!roundTrip) {
     url.searchParams.set('source', 'first');
@@ -151,7 +152,11 @@ function readStop(value: unknown): OptimizeStop | null {
   return { id: stop.id, longitude: stop.longitude, latitude: stop.latitude };
 }
 
-function readTrip(body: unknown, stops: OptimizeStop[]): { duration: number; route: RouteResult } | null {
+function readTrip(
+  body: unknown,
+  stops: OptimizeStop[],
+  roundTrip: boolean,
+): { duration: number; route: RouteResult } | null {
   if (typeof body !== 'object' || body === null) {
     return null;
   }
@@ -164,9 +169,10 @@ function readTrip(body: unknown, stops: OptimizeStop[]): { duration: number; rou
   if (waypoints.length !== stops.length) {
     return null;
   }
-  const geometry = readGeometry(trips[0]);
+  const expectedLegs = roundTrip ? stops.length : stops.length - 1;
+  const legs = readLegs(trips[0], expectedLegs);
   const duration = readDuration(trips[0]);
-  if (!geometry || duration === null) {
+  if (!legs || duration === null) {
     return null;
   }
   const ranked = stops.map((stop, index) => {
@@ -181,7 +187,49 @@ function readTrip(body: unknown, stops: OptimizeStop[]): { duration: number; rou
     return null;
   }
   ranked.sort((left, right) => Number(left.waypointIndex) - Number(right.waypointIndex));
-  return { duration, route: { order: ranked.map((item) => item.id), geometry } };
+  return { duration, route: { order: ranked.map((item) => item.id), legs } };
+}
+
+function readLegs(trip: unknown, expected: number): RouteGeometry[] | null {
+  if (typeof trip !== 'object' || trip === null || !('legs' in trip) || !Array.isArray(trip.legs)) {
+    return null;
+  }
+  if (trip.legs.length !== expected) {
+    return null;
+  }
+  const legs: RouteGeometry[] = [];
+  for (const leg of trip.legs) {
+    const line = readLeg(leg);
+    if (!line) {
+      return null;
+    }
+    legs.push(line);
+  }
+  return legs;
+}
+
+function readLeg(leg: unknown): RouteGeometry | null {
+  if (typeof leg !== 'object' || leg === null || !('steps' in leg) || !Array.isArray(leg.steps)) {
+    return null;
+  }
+  const coordinates: [number, number][] = [];
+  for (const step of leg.steps) {
+    const geometry = readGeometry(step);
+    if (!geometry) {
+      continue;
+    }
+    for (const point of geometry.coordinates) {
+      const last = coordinates[coordinates.length - 1];
+      if (last && last[0] === point[0] && last[1] === point[1]) {
+        continue;
+      }
+      coordinates.push(point);
+    }
+  }
+  if (coordinates.length < 2) {
+    return null;
+  }
+  return { type: 'LineString', coordinates };
 }
 
 function readDuration(trip: unknown): number | null {
