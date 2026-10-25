@@ -43,9 +43,12 @@ export function MapView({
   const draggedIds = useRef(new Set<string>());
   const skipNextFly = useRef(true);
   const previousStops = useRef<Stop[]>([]);
+  const stopsRef = useRef(stops);
   const [map, setMap] = useState<mapboxgl.Map | null>(null);
   const [status, setStatus] = useState<MapStatus>('loading');
   const [message, setMessage] = useState('Loading map');
+
+  stopsRef.current = stops;
 
   useEffect(() => {
     onProximityChangeRef.current = onProximityChange;
@@ -70,21 +73,34 @@ export function MapView({
     let mapInstance: mapboxgl.Map | undefined;
     let cancelled = false;
 
+    const savedView = loadMapView();
+    const openingStops = stopsRef.current;
+    const openingCenter = savedView
+      ? ([savedView.longitude, savedView.latitude] as mapboxgl.LngLatLike)
+      : openingStops.length > 0
+        ? stopBounds(openingStops).getCenter()
+        : MINSK;
+    const openingZoom = savedView?.zoom ?? (openingStops.length === 1 ? USER_ZOOM : CITY_ZOOM);
+    let remember = savedView !== null;
+
     mapboxgl.accessToken = token;
     mapInstance = new mapboxgl.Map({
       container,
       style: 'mapbox://styles/mapbox/streets-v12',
-      center: MINSK,
-      zoom: CITY_ZOOM,
+      center: openingCenter,
+      zoom: openingZoom,
     });
     mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
     const publishCenter = () => {
       const center = mapInstance?.getCenter();
-      if (!center) {
+      if (!center || !mapInstance) {
         return;
       }
       onProximityChangeRef.current({ longitude: center.lng, latitude: center.lat });
+      if (remember) {
+        saveMapView({ longitude: center.lng, latitude: center.lat, zoom: mapInstance.getZoom() });
+      }
     };
 
     let loaded = false;
@@ -92,6 +108,14 @@ export function MapView({
       loaded = true;
       if (cancelled) {
         return;
+      }
+      if (!savedView && openingStops.length > 0 && mapInstance) {
+        mapInstance.fitBounds(stopBounds(openingStops), { padding: 72, maxZoom: USER_ZOOM, duration: 0 });
+        remember = true;
+      } else if (!savedView && mapInstance) {
+        askForLocation(mapInstance, () => cancelled, () => {
+          remember = true;
+        });
       }
       setStatus('ready');
       setMap(mapInstance ?? null);
@@ -114,8 +138,6 @@ export function MapView({
         setMessage('The map could not be loaded. Check the Mapbox token.');
       }
     });
-    askForLocation(mapInstance);
-
     return () => {
       cancelled = true;
       setMap(null);
@@ -242,23 +264,74 @@ export function MapView({
   );
 }
 
-function askForLocation(map: mapboxgl.Map) {
+const MAP_VIEW_STORAGE_KEY = 'pathfinder.mapView';
+
+type SavedMapView = {
+  longitude: number;
+  latitude: number;
+  zoom: number;
+};
+
+function loadMapView(): SavedMapView | null {
+  try {
+    const raw = localStorage.getItem(MAP_VIEW_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return null;
+    }
+    const view = parsed as Record<string, unknown>;
+    if (
+      !isCoordinate(view.longitude, -180, 180) ||
+      !isCoordinate(view.latitude, -90, 90) ||
+      !isCoordinate(view.zoom, 0, 22)
+    ) {
+      return null;
+    }
+    return { longitude: view.longitude, latitude: view.latitude, zoom: view.zoom };
+  } catch {
+    return null;
+  }
+}
+
+function saveMapView(view: SavedMapView) {
+  localStorage.setItem(MAP_VIEW_STORAGE_KEY, JSON.stringify(view));
+}
+
+function isCoordinate(value: unknown, min: number, max: number): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function stopBounds(stops: Stop[]): mapboxgl.LngLatBounds {
+  const bounds = new mapboxgl.LngLatBounds();
+  for (const stop of stops) {
+    bounds.extend([stop.longitude, stop.latitude]);
+  }
+  return bounds;
+}
+
+function askForLocation(map: mapboxgl.Map, isCancelled: () => boolean, onReady: () => void) {
+  const show = (center: mapboxgl.LngLatLike, zoom: number) => {
+    if (isCancelled()) {
+      return;
+    }
+    onReady();
+    map.flyTo({ center, zoom });
+  };
+
   if (!navigator.geolocation) {
-    map.setCenter(MINSK);
-    map.setZoom(CITY_ZOOM);
+    show(MINSK, CITY_ZOOM);
     return;
   }
 
   navigator.geolocation.getCurrentPosition(
     (position) => {
-      map.flyTo({
-        center: [position.coords.longitude, position.coords.latitude],
-        zoom: USER_ZOOM,
-      });
+      show([position.coords.longitude, position.coords.latitude], USER_ZOOM);
     },
     () => {
-      map.setCenter(MINSK);
-      map.setZoom(CITY_ZOOM);
+      show(MINSK, CITY_ZOOM);
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
   );

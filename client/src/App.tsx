@@ -2,7 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { ConfigProvider } from 'antd';
 import { labelForPoint, type MapCenter } from './geocoding';
 import { MapView } from './MapView';
-import { isRouteResult, loadRoundTrip, orderStops, saveRoundTrip, type RouteGeometry } from './route';
+import {
+  isRouteResult,
+  loadLock,
+  loadRoundTrip,
+  LOCK_FIRST_STORAGE_KEY,
+  LOCK_LAST_STORAGE_KEY,
+  orderStops,
+  saveLock,
+  saveRoundTrip,
+  type RouteGeometry,
+} from './route';
 import { StopsToolbar } from './StopsToolbar';
 import { loadStops, MAX_STOPS, saveStops, type Stop } from './stops';
 
@@ -14,6 +24,8 @@ export function App() {
   const [proximity, setProximity] = useState<MapCenter>(MINSK);
   const [selecting, setSelecting] = useState(false);
   const [roundTrip, setRoundTrip] = useState(loadRoundTrip);
+  const [lockFirst, setLockFirst] = useState(() => loadLock(LOCK_FIRST_STORAGE_KEY));
+  const [lockLast, setLockLast] = useState(() => loadLock(LOCK_LAST_STORAGE_KEY));
   const [route, setRoute] = useState<RouteGeometry[] | null>(null);
   const [building, setBuilding] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -27,6 +39,20 @@ export function App() {
   useEffect(() => {
     saveRoundTrip(roundTrip);
   }, [roundTrip]);
+
+  useEffect(() => {
+    saveLock(LOCK_FIRST_STORAGE_KEY, lockFirst);
+  }, [lockFirst]);
+
+  useEffect(() => {
+    saveLock(LOCK_LAST_STORAGE_KEY, lockLast);
+  }, [lockLast]);
+
+  useEffect(() => {
+    if (lockFirst && lockLast && roundTrip) {
+      setRoundTrip(false);
+    }
+  }, [lockFirst, lockLast, roundTrip]);
 
   useEffect(() => {
     if (stops.length >= MAX_STOPS) {
@@ -79,8 +105,27 @@ export function App() {
   }
 
   function changeRoundTrip(next: boolean) {
+    if (lockFirst && lockLast) {
+      return;
+    }
     clearRoute();
     setRoundTrip(next);
+  }
+
+  function changeLockFirst(next: boolean) {
+    clearRoute();
+    setLockFirst(next);
+    if (next && lockLast) {
+      setRoundTrip(false);
+    }
+  }
+
+  function changeLockLast(next: boolean) {
+    clearRoute();
+    setLockLast(next);
+    if (next && lockFirst) {
+      setRoundTrip(false);
+    }
   }
 
   function clearRoute() {
@@ -104,6 +149,8 @@ export function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roundTrip,
+          lockFirst,
+          lockLast,
           stops: snapshot.map(({ id, longitude, latitude }) => ({ id, longitude, latitude })),
         }),
       });
@@ -142,9 +189,6 @@ export function App() {
       }}
     >
       <div className="app">
-        <header className="header">
-          <h1>Pathfinder</h1>
-        </header>
         <main className="stage">
           <MapView
             token={token}
@@ -163,11 +207,15 @@ export function App() {
             proximity={proximity}
             selecting={selecting}
             roundTrip={roundTrip}
+            lockFirst={lockFirst}
+            lockLast={lockLast}
             building={building}
             routeError={routeError}
             routeActive={route !== null}
             onSelectingChange={setSelecting}
             onRoundTripChange={changeRoundTrip}
+            onLockFirstChange={changeLockFirst}
+            onLockLastChange={changeLockLast}
             onBuildRoute={() => void buildRoute()}
             onStopsChange={replaceStops}
           />

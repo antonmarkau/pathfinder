@@ -12,6 +12,15 @@ type OptimizeStop = {
 type OptimizeRequest = {
   stops: OptimizeStop[];
   roundTrip: boolean;
+  lockFirst: boolean;
+  lockLast: boolean;
+};
+
+type TripEnd = 'any' | 'first' | 'last';
+
+type TripEnds = {
+  source: TripEnd;
+  destination: TripEnd;
 };
 
 type RouteGeometry = {
@@ -33,9 +42,15 @@ export async function optimizeRoute(req: Request, res: Response) {
   }
 
   try {
-    const route = body.roundTrip
-      ? (await requestTrip(body.stops, true, token))?.route ?? null
-      : await shortestOpenTrip(body.stops, token);
+    const roundTrip = body.roundTrip && !(body.lockFirst && body.lockLast);
+    const route = roundTrip
+      ? (
+          await requestTrip(body.stops, true, {
+            source: body.lockFirst ? 'first' : 'any',
+            destination: body.lockLast ? 'last' : 'any',
+          }, token)
+        )?.route ?? null
+      : await shortestOpenTrip(body.stops, token, body.lockFirst, body.lockLast);
     if (!route) {
       res.status(502).json({ error: 'The route could not be built' });
       return;
@@ -46,19 +61,15 @@ export async function optimizeRoute(req: Request, res: Response) {
   }
 }
 
-async function shortestOpenTrip(stops: OptimizeStop[], token: string): Promise<RouteResult | null> {
-  const candidates: OptimizeStop[][] = [];
-  for (let start = 0; start < stops.length; start += 1) {
-    for (let end = 0; end < stops.length; end += 1) {
-      if (start === end) {
-        continue;
-      }
-      const middle = stops.filter((_, index) => index !== start && index !== end);
-      candidates.push([stops[start], ...middle, stops[end]]);
-    }
-  }
-
-  const trips = await mapPool(candidates, 4, (candidate) => requestTrip(candidate, false, token));
+async function shortestOpenTrip(
+  stops: OptimizeStop[],
+  token: string,
+  lockFirst: boolean,
+  lockLast: boolean,
+): Promise<RouteResult | null> {
+  const candidates = openCandidates(stops, lockFirst, lockLast);
+  const fixedEnds: TripEnds = { source: 'first', destination: 'last' };
+  const trips = await mapPool(candidates, 4, (candidate) => requestTrip(candidate, false, fixedEnds, token));
   let best: { duration: number; route: RouteResult } | null = null;
   for (const trip of trips) {
     if (!trip || (best && trip.duration >= best.duration)) {
@@ -69,12 +80,34 @@ async function shortestOpenTrip(stops: OptimizeStop[], token: string): Promise<R
   return best?.route ?? null;
 }
 
+function openCandidates(stops: OptimizeStop[], lockFirst: boolean, lockLast: boolean): OptimizeStop[][] {
+  if (lockFirst && lockLast) {
+    return [[stops[0], ...stops.slice(1, -1), stops[stops.length - 1]]];
+  }
+
+  const candidates: OptimizeStop[][] = [];
+  for (let start = 0; start < stops.length; start += 1) {
+    if (lockFirst && start !== 0) {
+      continue;
+    }
+    for (let end = 0; end < stops.length; end += 1) {
+      if (start === end || (lockLast && end !== stops.length - 1)) {
+        continue;
+      }
+      const middle = stops.filter((_, index) => index !== start && index !== end);
+      candidates.push([stops[start], ...middle, stops[end]]);
+    }
+  }
+  return candidates;
+}
+
 async function requestTrip(
   stops: OptimizeStop[],
   roundTrip: boolean,
+  ends: TripEnds,
   token: string,
 ): Promise<{ duration: number; route: RouteResult } | null> {
-  const response = await fetch(optimizationUrl(stops, roundTrip, token));
+  const response = await fetch(optimizationUrl(stops, roundTrip, ends, token));
   if (!response.ok) {
     return null;
   }
@@ -101,16 +134,20 @@ type RouteResult = {
   legs: RouteGeometry[];
 };
 
-function optimizationUrl(stops: OptimizeStop[], roundTrip: boolean, token: string): URL {
+function optimizationUrl(stops: OptimizeStop[], roundTrip: boolean, ends: TripEnds, token: string): URL {
   const coordinates = stops.map((stop) => `${stop.longitude.toFixed(6)},${stop.latitude.toFixed(6)}`).join(';');
   const url = new URL(`https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${coordinates}`);
   url.searchParams.set('geometries', 'geojson');
   url.searchParams.set('overview', 'full');
   url.searchParams.set('steps', 'true');
   url.searchParams.set('roundtrip', roundTrip ? 'true' : 'false');
-  if (!roundTrip) {
-    url.searchParams.set('source', 'first');
-    url.searchParams.set('destination', 'last');
+  const source = roundTrip ? ends.source : 'first';
+  const destination = roundTrip ? ends.destination : 'last';
+  if (source !== 'any') {
+    url.searchParams.set('source', source);
+  }
+  if (destination !== 'any') {
+    url.searchParams.set('destination', destination);
   }
   url.searchParams.set('access_token', token);
   return url;
@@ -121,7 +158,12 @@ function readRequest(body: unknown): OptimizeRequest | null {
     return null;
   }
   const record = body as Record<string, unknown>;
-  if (typeof record.roundTrip !== 'boolean' || !Array.isArray(record.stops)) {
+  if (
+    typeof record.roundTrip !== 'boolean' ||
+    typeof record.lockFirst !== 'boolean' ||
+    typeof record.lockLast !== 'boolean' ||
+    !Array.isArray(record.stops)
+  ) {
     return null;
   }
   if (record.stops.length < MIN_STOPS || record.stops.length > MAX_STOPS) {
@@ -135,7 +177,12 @@ function readRequest(body: unknown): OptimizeRequest | null {
     }
     stops.push(stop);
   }
-  return { roundTrip: record.roundTrip, stops };
+  return {
+    roundTrip: record.roundTrip,
+    lockFirst: record.lockFirst,
+    lockLast: record.lockLast,
+    stops,
+  };
 }
 
 function readStop(value: unknown): OptimizeStop | null {

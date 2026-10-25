@@ -26,11 +26,20 @@ body,
 
 .header {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
+  gap: 12px;
   height: 56px;
-  padding: 0 20px;
+  padding: 0 16px;
+  border-radius: 12px 12px 0 0;
   background: #14323f;
   color: #f4f7f8;
+}
+
+.logo {
+  display: block;
+  height: 40px;
+  width: auto;
 }
 
 .header h1 {
@@ -81,13 +90,20 @@ body,
   top: 16px;
   left: 16px;
   z-index: 2;
+  display: flex;
+  flex-direction: column;
   width: min(22rem, calc(100% - 32px));
   max-height: calc(100% - 32px);
-  padding: 16px 16px 18px;
-  overflow: auto;
+  overflow: hidden;
   border-radius: 12px;
   background: #ffffff;
   box-shadow: 0 8px 24px rgba(20, 50, 63, 0.16);
+}
+
+.toolbar-body {
+  min-height: 0;
+  padding: 16px 16px 18px;
+  overflow: auto;
 }
 
 .toolbar h2 {
@@ -109,11 +125,23 @@ body,
   margin-top: 8px;
 }
 
+.stop-index,
+.stop-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #14323f;
+  color: #f4f7f8;
+  font: 650 13px/1 "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
 .stop-index {
-  flex: 0 0 1.25rem;
-  color: #5c6e78;
-  font-size: 13px;
-  text-align: right;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
 }
 
 .stop-label {
@@ -129,6 +157,14 @@ body,
 .stop-search {
   flex: 1;
   min-width: 0;
+}
+
+.map-pick.ant-btn {
+  width: auto;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 20px;
 }
 
 .stop-error {
@@ -151,18 +187,10 @@ body,
 }
 
 .stop-marker {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 28px;
   height: 28px;
-  border: 2px solid #ffffff;
-  border-radius: 50%;
-  background: #14323f;
   box-shadow: 0 2px 6px rgba(20, 50, 63, 0.35);
-  color: #f4f7f8;
   cursor: grab;
-  font: 650 13px/1 "Segoe UI", "Helvetica Neue", sans-serif;
 }
 
 .stop-marker:active {

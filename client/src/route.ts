@@ -1,6 +1,8 @@
 import type { Stop } from './stops';
 
 export const ROUND_TRIP_STORAGE_KEY = 'pathfinder.roundTrip';
+export const LOCK_FIRST_STORAGE_KEY = 'pathfinder.lockFirst';
+export const LOCK_LAST_STORAGE_KEY = 'pathfinder.lockLast';
 
 export type RouteGeometry = {
   type: 'LineString';
@@ -48,6 +50,14 @@ export function loadRoundTrip(): boolean {
 
 export function saveRoundTrip(roundTrip: boolean) {
   localStorage.setItem(ROUND_TRIP_STORAGE_KEY, String(roundTrip));
+}
+
+export function loadLock(key: string): boolean {
+  return localStorage.getItem(key) === 'true';
+}
+
+export function saveLock(key: string, locked: boolean) {
+  localStorage.setItem(key, String(locked));
 }
 
 export function orderStops(stops: Stop[], order: string[]): Stop[] | null {
