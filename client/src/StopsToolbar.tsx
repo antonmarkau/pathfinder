@@ -239,7 +239,8 @@ export function StopsToolbar({
                 onClick={() => openEdit(stop)}
               />
               <Button
-                danger
+                color="danger"
+                variant="solid"
                 icon={<DeleteOutlined />}
                 aria-label={`Delete ${stop.label}`}
                 onClick={() => removeStop(stop.id)}
@@ -344,7 +345,8 @@ export function StopsToolbar({
             onClick={() => void confirm()}
           />
           <Button
-            danger
+            color="danger"
+            variant="solid"
             icon={<DeleteOutlined />}
             aria-label={
               draft?.mode === 'edit'
