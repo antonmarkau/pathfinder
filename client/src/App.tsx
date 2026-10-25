@@ -17,12 +17,15 @@ import { StopsToolbar } from './StopsToolbar';
 import { loadStops, MAX_STOPS, saveStops, type Stop } from './stops';
 
 const MINSK: MapCenter = { longitude: 27.559, latitude: 53.9006 };
+const MOBILE_QUERY = '(max-width: 640px)';
 
 export function App() {
   const { token, error } = useMapboxToken();
   const [stops, setStops] = useState<Stop[]>(loadStops);
   const [proximity, setProximity] = useState<MapCenter>(MINSK);
   const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<MapCenter | null>(null);
+  const [mobile] = useState(() => window.matchMedia(MOBILE_QUERY).matches);
   const [roundTrip, setRoundTrip] = useState(loadRoundTrip);
   const [lockFirst, setLockFirst] = useState(() => loadLock(LOCK_FIRST_STORAGE_KEY));
   const [lockLast, setLockLast] = useState(() => loadLock(LOCK_LAST_STORAGE_KEY));
@@ -57,22 +60,15 @@ export function App() {
   useEffect(() => {
     if (stops.length >= MAX_STOPS) {
       setSelecting(false);
+      setPicked(null);
     }
   }, [stops.length]);
 
-  async function addStopFromMap(center: MapCenter) {
-    if (!token || stops.length >= MAX_STOPS) {
-      return;
+  function changeSelecting(next: boolean) {
+    setSelecting(next);
+    if (!next) {
+      setPicked(null);
     }
-    setSelecting(false);
-    const label = await labelForPoint(center.longitude, center.latitude, token, new AbortController().signal);
-    const stop: Stop = {
-      id: crypto.randomUUID(),
-      label,
-      longitude: center.longitude,
-      latitude: center.latitude,
-    };
-    updateStops((current) => (current.length >= MAX_STOPS ? current : [...current, stop]));
   }
 
   async function moveStop(id: string, center: MapCenter) {
@@ -198,7 +194,7 @@ export function App() {
             onProximityChange={setProximity}
             route={route}
             roundTrip={roundTrip}
-            onMapClick={(center) => void addStopFromMap(center)}
+            onPick={setPicked}
             onStopDrag={(id, center) => void moveStop(id, center)}
           />
           <StopsToolbar
@@ -206,13 +202,15 @@ export function App() {
             stops={stops}
             proximity={proximity}
             selecting={selecting}
+            picked={picked}
+            mobile={mobile}
             roundTrip={roundTrip}
             lockFirst={lockFirst}
             lockLast={lockLast}
             building={building}
             routeError={routeError}
             routeActive={route !== null}
-            onSelectingChange={setSelecting}
+            onSelectingChange={changeSelecting}
             onRoundTripChange={changeRoundTrip}
             onLockFirstChange={changeLockFirst}
             onLockLastChange={changeLockLast}

@@ -6,9 +6,10 @@ Do the next unchecked step only. Mark it done in this file as part of that chang
 
 ## Product
 
-- The map fills the page. The toolbar's top is the Pathfinder logo to the left of the name Pathfinder, on the dark header color. The toolbar keeps its width and rounded corners.
+- The map fills the page. The toolbar's top is the Pathfinder logo to the left of the name Pathfinder, on the dark header color. On a wide screen the toolbar keeps its width and rounded corners and stays open. On a phone-sized screen at load, the toolbar uses the full width with the same margins. It grows with its contents, and the list scrolls when the card is taller than the screen. A centered caret at the bottom of the card points up while open and down while collapsed, and that caret stays visible when the card is collapsed. Tapping it opens or closes the card. Opening and closing eases out quickly. The header then casts a shadow over the caret, so the caret sits under the header. While a place is being chosen on the map, the collapsed card also keeps that stop's row. With stops saved it starts collapsed. With none, it starts open. That choice is not saved, and resizing a wide window does not switch to the phone card.
 - No accounts. The stop list, the toolbar toggles, and the map view persist in `localStorage` under `pathfinder.stops`, `pathfinder.roundTrip`, `pathfinder.lockFirst`, `pathfinder.lockLast`, and `pathfinder.mapView`.
-- Desktop layout first. Keep the upper-left toolbar and the map as separate regions so a later mobile pass can stack them.
+- Desktop layout first. The toolbar floats over the map on every screen.
+- The map has no zoom or compass buttons. It stays flat and north-up: it cannot tilt or rotate. Scroll and pinch still zoom.
 - On load, restore the saved map center and zoom. If none was saved and there are stops, frame those stops. If there is no saved view and no stops, ask for the browser location. If they deny it, or if geolocation fails, center on Minsk at longitude `27.559`, latitude `53.9006`.
 - Stops are two to twelve. The add control stops at twelve.
 - Routing uses the Mapbox Optimization API with profile `mapbox/driving`.
@@ -18,15 +19,15 @@ Do the next unchecked step only. Mark it done in this file as part of that chang
   - Both locks on: Round trip turns off and its switch is disabled. The trip starts at the current first stop and ends at the current last stop.
 - A stop is `{ id, label, longitude, latitude }`. Only a geocoded place becomes a stop.
 - Ant Design is for the toolbar. The map stays Mapbox GL.
-- Toolbar order: the logo and name, the Stops heading, saved stops, at most one draft search row, a full-width grey Plus button, the Round trip switch, Lock the first point, Lock the last point, then a full-width green Build route button with a car icon. Build route is enabled for 2–12 stops.
+- Toolbar order: the logo and name, the Stops heading, a short hint, saved stops, at most one draft search row, a full-width grey Plus button, the Round trip switch, Lock the first point, Lock the last point, then a full-width green Build route button with a car icon. Build route is enabled for 2–12 stops.
 - Plus opens the draft and is disabled while a draft or an edit is open, and when 12 stops are saved.
 - The draft row is the search field, then a blue checkmark Confirm button, then the red Remove button. A small Map button sits inside the field, on the right, only as wide as the word. Confirm stays disabled until the user picks a suggestion or enters `latitude, longitude` (placeholder `53.9006, 27.559`). Remove on a new draft closes it without adding a stop.
 - A saved row shows a numbered circle, a truncated label, a yellow pencil Edit button, and a red trash Delete button. The circle is smaller than the map marker and has no shadow. It uses a white number on the marker color. Before a route is built, and for a one-way start, that color is the neutral marker color. Markers on the map use the same list order, starting at 1.
 - Edit turns that row back into the same search row, filled with the current name. The marker stays until Confirm replaces it. Clearing the field cancels the edit. Remove deletes the stop.
 - Search calls the Mapbox Geocoding API, debounced, with at most five results. Proximity is the current map center. The language follows the browser. A coordinate pair is reverse-geocoded for its label.
-- Map, inside the draft search field, is a toolbar mode. The next map click is reverse-geocoded and appended. The mode ends after that click, or when Map is pressed again. It is disabled at 12 stops.
+- Map, inside the draft search field, drops a draggable marker at the map center. It is the same dark circle as a stop, with no number, and a short stem. The place is the tip of the stem. It lifts once, then falls and bounces. Dragging it, or tapping elsewhere, moves it and does not replay the bounce. The position is written into the open field. Confirm adds or replaces the stop and leaves the mode. Pressing Map again, or Remove, cancels. On a phone, Map collapses the card to the header and the stop being chosen, so its address, Confirm, and Remove stay visible. Confirming or removing that stop opens the full card again. Pressing Map again cancels and opens the card too. It is disabled at 12 stops.
 - Markers are draggable. Dropping a marker reverse-geocodes the new point and updates that stop's label and coordinates in the list and on the map.
-- Build route calls `POST /api/optimize`, reorders the stops into visit order, and draws each hop in its own color. The hop and the marker it leads to share a color. A one-way start has no incoming hop, so that marker stays neutral. Adding, editing, deleting, or dragging a stop, or switching round trip or either lock, clears the line until Build route is pressed again.
+- Build route calls `POST /api/optimize`, reorders the stops into visit order, and draws each hop in its own color. On a phone, the card collapses once that route is on the map. The hop and the marker it leads to share a color. A one-way start has no incoming hop, so that marker stays neutral. Adding, editing, deleting, or dragging a stop, or switching round trip or either lock, clears the line until Build route is pressed again.
 
 ## Runtime
 
@@ -64,4 +65,5 @@ Response: visit order as stop ids, plus one GeoJSON `LineString` per hop. The li
 - [x] 5. Optimize. Round-trip switch above Build route. Enable that button for 2–12 stops. `POST /api/optimize` draws the route and renumbers markers in visit order. Adding, editing, or deleting a stop clears the line until Build route is pressed again.
 - [x] 6. Colored hops. Request the step geometry, join the steps of each leg into one line, and paint that line and the marker it leads to with the same color.
 - [x] 7. Add locking the first and last stops. If both are locked, round trip option becomes unavailable.
-- [ ] 8. Render. Deploy the image, set the token, and confirm `/health` and the map on the public URL.
+- [x] 8. Render. Deploy the image, set the token, and confirm `/health` and the map on the public URL.
+- [x] 9. Optimise for mobile browsers. A phone-sized screen gets a full-width collapsible toolbar. Map mode drops a draggable marker instead of waiting for a bare tap.

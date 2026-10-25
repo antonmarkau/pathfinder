@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AutoComplete, Button, Input, Switch } from 'antd';
-import { CarOutlined, CheckOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
-import { forwardGeocode, parseLatLng, reverseGeocode, type GeocodedPlace, type MapCenter } from './geocoding';
+import { CaretUpOutlined, CarOutlined, CheckOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { forwardGeocode, labelForPoint, parseLatLng, reverseGeocode, type GeocodedPlace, type MapCenter } from './geocoding';
 import logo from './logo.png';
 import { stopColor } from './route';
 import { MAX_STOPS, type Stop } from './stops';
@@ -13,6 +13,8 @@ type StopsToolbarProps = {
   stops: Stop[];
   proximity: MapCenter;
   selecting: boolean;
+  picked: MapCenter | null;
+  mobile: boolean;
   roundTrip: boolean;
   lockFirst: boolean;
   lockLast: boolean;
@@ -32,6 +34,8 @@ export function StopsToolbar({
   stops,
   proximity,
   selecting,
+  picked,
+  mobile,
   roundTrip,
   lockFirst,
   lockLast,
@@ -46,6 +50,10 @@ export function StopsToolbar({
   onStopsChange,
 }: StopsToolbarProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [collapsed, setCollapsed] = useState(() => mobile && stops.length > 0);
+  const wasSelecting = useRef(false);
+  const routeWasActive = useRef(routeActive);
+  const editOrigin = useRef<{ id: string; longitude: number; latitude: number } | null>(null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<GeocodedPlace | null>(null);
   const [suggestions, setSuggestions] = useState<GeocodedPlace[]>([]);
@@ -55,19 +63,155 @@ export function StopsToolbar({
   const coordinates = parseLatLng(query);
   const canConfirm = selected !== null || coordinates !== null;
   const draftOpen = draft !== null;
+  const panel = !mobile ? 'desktop' : !collapsed ? 'open' : selecting && draftOpen ? 'picking' : 'closed';
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const liveHeight = useRef(0);
+  const heightBeforeCommit = useRef(0);
+  const skipMotion = useRef(true);
+  heightBeforeCommit.current = liveHeight.current;
 
   useEffect(() => {
-    if (draft?.mode !== 'edit' || !selected) {
+    if (!mobile) {
+      return;
+    }
+    if (selecting) {
+      setCollapsed(true);
+    } else if (wasSelecting.current) {
+      setCollapsed(false);
+    }
+    wasSelecting.current = selecting;
+  }, [mobile, selecting]);
+
+  useEffect(() => {
+    if (mobile && routeActive && !routeWasActive.current) {
+      setCollapsed(true);
+    }
+    routeWasActive.current = routeActive;
+  }, [mobile, routeActive]);
+
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || !mobile) {
+      return;
+    }
+    const observer = new ResizeObserver(() => {
+      if (body.style.height === '' || body.style.height === 'auto') {
+        liveHeight.current = body.getBoundingClientRect().height;
+      }
+    });
+    observer.observe(body);
+    return () => observer.disconnect();
+  }, [mobile]);
+
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    if (!body || panel === 'desktop') {
+      return;
+    }
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const settle = (hidden: boolean) => {
+      body.style.transition = '';
+      body.style.height = hidden ? '0px' : '';
+      body.style.overflow = hidden ? 'hidden' : '';
+      body.inert = hidden;
+      liveHeight.current = hidden ? 0 : body.getBoundingClientRect().height;
+    };
+
+    if (skipMotion.current || reduced) {
+      skipMotion.current = false;
+      settle(panel === 'closed');
+      return;
+    }
+
+    const visual = body.getBoundingClientRect().height;
+    body.style.overflow = 'hidden';
+    body.style.height = 'auto';
+    const natural = body.getBoundingClientRect().height;
+    const end = panel === 'closed' ? 0 : natural;
+    const from = Math.abs(visual - end) < 1 ? heightBeforeCommit.current : visual;
+    body.inert = panel === 'closed';
+    if (Math.abs(from - end) < 1) {
+      settle(panel === 'closed');
+      return;
+    }
+
+    body.style.transition = 'none';
+    body.style.height = `${from}px`;
+    body.getBoundingClientRect();
+    body.style.transition = `height ${CARD_MOTION_MS}ms ${CARD_MOTION_EASING}`;
+    body.style.height = `${end}px`;
+
+    let settled = false;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      settle(panel === 'closed');
+    };
+    const onEnd = (event: TransitionEvent) => {
+      if (event.target === body && event.propertyName === 'height') {
+        finish();
+      }
+    };
+    body.addEventListener('transitionend', onEnd);
+    const timer = window.setTimeout(finish, CARD_MOTION_MS + 50);
+    return () => {
+      settled = true;
+      window.clearTimeout(timer);
+      body.removeEventListener('transitionend', onEnd);
+    };
+  }, [panel]);
+
+  useEffect(() => {
+    if (!selecting || !picked || !token || !draftOpen) {
+      return;
+    }
+    const point = picked;
+    let active = true;
+    const controller = new AbortController();
+    setQuery(`${point.latitude}, ${point.longitude}`);
+    setSelected(null);
+    setSuggestions([]);
+    setSearchError(null);
+    labelForPoint(point.longitude, point.latitude, token, controller.signal)
+      .then((label) => {
+        if (!active) {
+          return;
+        }
+        setQuery(label);
+        setSelected({
+          id: 'picked',
+          label,
+          longitude: point.longitude,
+          latitude: point.latitude,
+        });
+      })
+      .catch((error: unknown) => {
+        if (isAbortError(error)) {
+          return;
+        }
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [draftOpen, picked, selecting, token]);
+
+  useEffect(() => {
+    if (draft?.mode !== 'edit' || editOrigin.current?.id !== draft.stopId) {
       return;
     }
     const stop = stops.find((item) => item.id === draft.stopId);
-    if (!stop) {
+    const origin = editOrigin.current;
+    if (!stop || !origin) {
       return;
     }
-    if (stop.longitude !== selected.longitude || stop.latitude !== selected.latitude) {
+    if (stop.longitude !== origin.longitude || stop.latitude !== origin.latitude) {
       closeDraft();
     }
-  }, [draft, selected, stops]);
+  }, [draft, stops]);
 
   useEffect(() => {
     if (!token || !draftOpen || parseLatLng(query) || query.trim().length < 2 || selected?.label === query) {
@@ -109,6 +253,7 @@ export function StopsToolbar({
       closeDraft();
       return;
     }
+    editOrigin.current = { id: stop.id, longitude: stop.longitude, latitude: stop.latitude };
     setDraft({ mode: 'edit', stopId: stop.id });
     setQuery(stop.label);
     setSelected({
@@ -122,6 +267,7 @@ export function StopsToolbar({
   }
 
   function closeDraft() {
+    editOrigin.current = null;
     onSelectingChange(false);
     setDraft(null);
     setQuery('');
@@ -131,6 +277,7 @@ export function StopsToolbar({
   }
 
   function removeDraft() {
+    setCollapsed(false);
     if (draft?.mode === 'edit') {
       removeStop(draft.stopId);
       return;
@@ -183,6 +330,7 @@ export function StopsToolbar({
         );
       }
       closeDraft();
+      setCollapsed(false);
     } finally {
       setConfirming(false);
     }
@@ -212,17 +360,21 @@ export function StopsToolbar({
   }
 
   return (
-    <aside className="toolbar" aria-label="Stops">
+    <aside className={toolbarClass()} aria-label="Stops">
       <header className="header">
         <img className="logo" src={logo} alt="" />
         <h1>Pathfinder</h1>
       </header>
-      <div className="toolbar-body">
+      <div className="toolbar-body" ref={bodyRef}>
+      <div className="toolbar-body-inner">
       <h2>Stops</h2>
+      <p className="stop-hint">Type an address or coordinates, or choose the place on the map.</p>
       <ul className="stop-list">
         {stops.map((stop, index) =>
           draft?.mode === 'edit' && draft.stopId === stop.id ? (
-            <li key={stop.id}>{renderDraft(`${index + 1}`, index)}</li>
+            <li key={stop.id} className="picking-stop">
+              {renderDraft(`${index + 1}`, index)}
+            </li>
           ) : (
             <li key={stop.id} className="stop-row">
               <span className="stop-index" style={indexStyle(index)}>
@@ -249,7 +401,7 @@ export function StopsToolbar({
           ),
         )}
       </ul>
-      {draft?.mode === 'add' ? renderDraft(String(stops.length + 1)) : null}
+      {draft?.mode === 'add' ? <div className="picking-stop">{renderDraft(String(stops.length + 1))}</div> : null}
       <Button
         className="toolbar-action"
         block
@@ -289,8 +441,27 @@ export function StopsToolbar({
         Build route
       </Button>
       </div>
+      </div>
+      {mobile ? (
+        <Button
+          type="text"
+          className="toolbar-pull"
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand stops' : 'Collapse stops'}
+          onClick={() => setCollapsed((open) => !open)}
+        >
+          <CaretUpOutlined />
+        </Button>
+      ) : null}
     </aside>
   );
+
+  function toolbarClass() {
+    const picking = mobile && collapsed && selecting && draftOpen;
+    return ['toolbar', mobile ? 'mobile' : '', mobile && collapsed ? 'collapsed' : '', picking ? 'picking' : '']
+      .filter(Boolean)
+      .join(' ');
+  }
 
   function indexStyle(index: number): { background: string } | undefined {
     const color = stopColor(index, roundTrip, routeActive);
@@ -367,6 +538,9 @@ type SuggestionOption = {
   value: string;
   place: GeocodedPlace;
 };
+
+const CARD_MOTION_MS = 240;
+const CARD_MOTION_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';

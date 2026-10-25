@@ -19,7 +19,7 @@ type MapViewProps = {
   route: RouteGeometry[] | null;
   roundTrip: boolean;
   onProximityChange: (center: MapCenter) => void;
-  onMapClick: (center: MapCenter) => void;
+  onPick: (center: MapCenter) => void;
   onStopDrag: (id: string, center: MapCenter) => void;
 };
 
@@ -31,14 +31,13 @@ export function MapView({
   route,
   roundTrip,
   onProximityChange,
-  onMapClick,
+  onPick,
   onStopDrag,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onProximityChangeRef = useRef(onProximityChange);
-  const onMapClickRef = useRef(onMapClick);
+  const onPickRef = useRef(onPick);
   const onStopDragRef = useRef(onStopDrag);
-  const selectingRef = useRef(selecting);
   const suppressClickUntil = useRef(0);
   const draggedIds = useRef(new Set<string>());
   const skipNextFly = useRef(true);
@@ -52,10 +51,9 @@ export function MapView({
 
   useEffect(() => {
     onProximityChangeRef.current = onProximityChange;
-    onMapClickRef.current = onMapClick;
+    onPickRef.current = onPick;
     onStopDragRef.current = onStopDrag;
-    selectingRef.current = selecting;
-  }, [onMapClick, onProximityChange, onStopDrag, selecting]);
+  }, [onPick, onProximityChange, onStopDrag]);
 
   useEffect(() => {
     if (error) {
@@ -89,8 +87,15 @@ export function MapView({
       style: 'mapbox://styles/mapbox/streets-v12',
       center: openingCenter,
       zoom: openingZoom,
+      bearing: 0,
+      pitch: 0,
+      maxPitch: 0,
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
     });
-    mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    mapInstance.touchZoomRotate.disableRotation();
+    mapInstance.keyboard.disableRotation();
 
     const publishCenter = () => {
       const center = mapInstance?.getCenter();
@@ -122,16 +127,6 @@ export function MapView({
       publishCenter();
     });
     mapInstance.on('moveend', publishCenter);
-    mapInstance.on('click', (event) => {
-      if (performance.now() < suppressClickUntil.current || !selectingRef.current) {
-        return;
-      }
-      const target = event.originalEvent.target;
-      if (target instanceof Element && target.closest('.mapboxgl-ctrl, .stop-marker')) {
-        return;
-      }
-      onMapClickRef.current({ longitude: event.lngLat.lng, latitude: event.lngLat.lat });
-    });
     mapInstance.on('error', () => {
       if (!loaded && !cancelled) {
         setStatus('error');
@@ -144,6 +139,56 @@ export function MapView({
       mapInstance?.remove();
     };
   }, [token]);
+
+  useEffect(() => {
+    if (!map || !selecting) {
+      return;
+    }
+
+    const element = document.createElement('div');
+    element.className = 'pick-anchor';
+    const pin = document.createElement('div');
+    pin.className = 'pick-pin pick-marker';
+    const circle = document.createElement('div');
+    circle.className = 'stop-marker';
+    const stick = document.createElement('div');
+    stick.className = 'pick-stick';
+    pin.append(circle, stick);
+    element.appendChild(pin);
+    element.setAttribute('role', 'button');
+    element.setAttribute('aria-label', 'Drag to choose a stop');
+    const marker = new mapboxgl.Marker({ element, anchor: 'bottom', draggable: true })
+      .setLngLat(map.getCenter())
+      .addTo(map);
+
+    const report = () => {
+      const lngLat = marker.getLngLat();
+      onPickRef.current({ longitude: lngLat.lng, latitude: lngLat.lat });
+    };
+    report();
+    marker.on('dragend', () => {
+      suppressClickUntil.current = performance.now() + 300;
+      report();
+    });
+
+    const onClick = (event: mapboxgl.MapMouseEvent) => {
+      if (performance.now() < suppressClickUntil.current) {
+        return;
+      }
+      const target = event.originalEvent.target;
+      if (target instanceof Element && target.closest('.mapboxgl-ctrl, .stop-marker, .pick-anchor')) {
+        return;
+      }
+      marker.setLngLat(event.lngLat);
+      report();
+    };
+    map.on('click', onClick);
+
+    return () => {
+      map.off('click', onClick);
+      marker.remove();
+    };
+  }, [map, selecting]);
 
   useEffect(() => {
     if (!map) {
