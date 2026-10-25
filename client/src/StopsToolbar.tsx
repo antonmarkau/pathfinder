@@ -90,6 +90,21 @@ export function StopsToolbar({
   }, [mobile, routeActive]);
 
   useEffect(() => {
+    if (!selecting) {
+      return;
+    }
+    const blurField = () => {
+      const input = document.querySelector('.stop-search input');
+      if (input instanceof HTMLInputElement && document.activeElement === input) {
+        input.blur();
+      }
+    };
+    blurField();
+    const timer = window.setTimeout(blurField, 50);
+    return () => window.clearTimeout(timer);
+  }, [selecting]);
+
+  useEffect(() => {
     const body = bodyRef.current;
     if (!body || !mobile) {
       return;
@@ -491,6 +506,7 @@ export function StopsToolbar({
             <Input
               placeholder="53.9006, 27.559"
               allowClear
+              styles={{ input: { fontSize: 16 } }}
               suffix={
                 <Button
                   className="map-pick"
