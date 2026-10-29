@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AutoComplete, Button, Input, Switch } from 'antd';
-import { CaretUpOutlined, CarOutlined, CheckOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { CaretUpOutlined, CarOutlined, CheckOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PlusOutlined } from '@ant-design/icons';
 import { forwardGeocode, labelForPoint, parseLatLng, reverseGeocode, type GeocodedPlace, type MapCenter } from './geocoding';
 import logo from './logo.png';
 import { stopColor } from './route';
 import { MAX_STOPS, type Stop } from './stops';
+import { openInYandex } from './yandex';
 
 type Draft = { mode: 'add' } | { mode: 'edit'; stopId: string };
 
@@ -463,8 +464,10 @@ export function StopsToolbar({
       >
         Build route
       </Button>
+      {routeActive ? renderYandexButton() : null}
       </div>
       </div>
+      {mobile && collapsed && routeActive && !selecting ? <div className="yandex-strip">{renderYandexButton()}</div> : null}
       {mobile ? (
         <Button
           type="text"
@@ -478,6 +481,19 @@ export function StopsToolbar({
       ) : null}
     </aside>
   );
+
+  function renderYandexButton() {
+    return (
+      <Button
+        className="toolbar-action yandex-action"
+        block
+        icon={<ExportOutlined />}
+        onClick={() => openInYandex(stops, roundTrip, mobile)}
+      >
+        Open in Yandex Maps
+      </Button>
+    );
+  }
 
   function toolbarClass() {
     const picking = mobile && collapsed && selecting && draftOpen;

@@ -260,6 +260,20 @@ body,
   margin-top: 8px;
 }
 
+.yandex-strip {
+  flex: 0 0 auto;
+  padding: 8px 16px 4px;
+  background: #ffffff;
+}
+
+.yandex-strip .toolbar-action {
+  margin-top: 0;
+}
+
+.toolbar.mobile.collapsed .toolbar-body .yandex-action {
+  display: none;
+}
+
 .round-trip {
   display: flex;
   align-items: center;
