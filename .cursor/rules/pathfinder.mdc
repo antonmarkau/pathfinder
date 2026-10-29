@@ -1,11 +1,9 @@
 ---
-description: Pathfinder constraints and the order of work in docs/PLAN.md
+description: Pathfinder product constraints
 alwaysApply: true
 ---
 
 # Pathfinder
-
-Read `docs/PLAN.md` before implementing. Do the next unchecked step only, then mark that step done in the same change.
 
 - TypeScript, React, and Node. One Render web service from the root Dockerfile. Listen on `0.0.0.0` and `process.env.PORT`. `GET /health` stays available.
 - One secret: `MAPBOX_ACCESS_TOKEN` in the repo-root `.env` (gitignored). The server reads it at runtime. The browser fetches the public token from the server. Do not add a second token variable, and do not log the token.
