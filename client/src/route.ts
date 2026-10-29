@@ -1,6 +1,7 @@
 import type { Stop } from './stops';
 
 export const ROUND_TRIP_STORAGE_KEY = 'pathfinder.roundTrip';
+export const TRAFFIC_STORAGE_KEY = 'pathfinder.traffic';
 export const LOCK_FIRST_STORAGE_KEY = 'pathfinder.lockFirst';
 export const LOCK_LAST_STORAGE_KEY = 'pathfinder.lockLast';
 

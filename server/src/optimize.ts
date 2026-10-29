@@ -12,6 +12,7 @@ type OptimizeStop = {
 type OptimizeRequest = {
   stops: OptimizeStop[];
   roundTrip: boolean;
+  traffic: boolean;
   lockFirst: boolean;
   lockLast: boolean;
 };
@@ -48,9 +49,9 @@ export async function optimizeRoute(req: Request, res: Response) {
           await requestTrip(body.stops, true, {
             source: body.lockFirst ? 'first' : 'any',
             destination: body.lockLast ? 'last' : 'any',
-          }, token)
+          }, body.traffic, token)
         )?.route ?? null
-      : await shortestOpenTrip(body.stops, token, body.lockFirst, body.lockLast);
+      : await shortestOpenTrip(body.stops, token, body.traffic, body.lockFirst, body.lockLast);
     if (!route) {
       res.status(502).json({ error: 'The route could not be built' });
       return;
@@ -64,12 +65,13 @@ export async function optimizeRoute(req: Request, res: Response) {
 async function shortestOpenTrip(
   stops: OptimizeStop[],
   token: string,
+  traffic: boolean,
   lockFirst: boolean,
   lockLast: boolean,
 ): Promise<RouteResult | null> {
   const candidates = openCandidates(stops, lockFirst, lockLast);
   const fixedEnds: TripEnds = { source: 'first', destination: 'last' };
-  const trips = await mapPool(candidates, 4, (candidate) => requestTrip(candidate, false, fixedEnds, token));
+  const trips = await mapPool(candidates, 4, (candidate) => requestTrip(candidate, false, fixedEnds, traffic, token));
   let best: { duration: number; route: RouteResult } | null = null;
   for (const trip of trips) {
     if (!trip || (best && trip.duration >= best.duration)) {
@@ -105,9 +107,10 @@ async function requestTrip(
   stops: OptimizeStop[],
   roundTrip: boolean,
   ends: TripEnds,
+  traffic: boolean,
   token: string,
 ): Promise<{ duration: number; route: RouteResult } | null> {
-  const response = await fetch(optimizationUrl(stops, roundTrip, ends, token));
+  const response = await fetch(optimizationUrl(stops, roundTrip, ends, traffic, token));
   if (!response.ok) {
     return null;
   }
@@ -134,9 +137,16 @@ type RouteResult = {
   legs: RouteGeometry[];
 };
 
-function optimizationUrl(stops: OptimizeStop[], roundTrip: boolean, ends: TripEnds, token: string): URL {
+function optimizationUrl(
+  stops: OptimizeStop[],
+  roundTrip: boolean,
+  ends: TripEnds,
+  traffic: boolean,
+  token: string,
+): URL {
+  const profile = traffic ? 'driving-traffic' : 'driving';
   const coordinates = stops.map((stop) => `${stop.longitude.toFixed(6)},${stop.latitude.toFixed(6)}`).join(';');
-  const url = new URL(`https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${coordinates}`);
+  const url = new URL(`https://api.mapbox.com/optimized-trips/v1/mapbox/${profile}/${coordinates}`);
   url.searchParams.set('geometries', 'geojson');
   url.searchParams.set('overview', 'full');
   url.searchParams.set('steps', 'true');
@@ -160,6 +170,7 @@ function readRequest(body: unknown): OptimizeRequest | null {
   const record = body as Record<string, unknown>;
   if (
     typeof record.roundTrip !== 'boolean' ||
+    typeof record.traffic !== 'boolean' ||
     typeof record.lockFirst !== 'boolean' ||
     typeof record.lockLast !== 'boolean' ||
     !Array.isArray(record.stops)
@@ -179,6 +190,7 @@ function readRequest(body: unknown): OptimizeRequest | null {
   }
   return {
     roundTrip: record.roundTrip,
+    traffic: record.traffic,
     lockFirst: record.lockFirst,
     lockLast: record.lockLast,
     stops,

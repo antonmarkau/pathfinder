@@ -16,12 +16,14 @@ type StopsToolbarProps = {
   picked: MapCenter | null;
   mobile: boolean;
   roundTrip: boolean;
+  traffic: boolean;
   lockFirst: boolean;
   lockLast: boolean;
   building: boolean;
   routeError: string | null;
   routeActive: boolean;
   onSelectingChange: (selecting: boolean) => void;
+  onTrafficChange: (traffic: boolean) => void;
   onRoundTripChange: (roundTrip: boolean) => void;
   onLockFirstChange: (locked: boolean) => void;
   onLockLastChange: (locked: boolean) => void;
@@ -37,12 +39,14 @@ export function StopsToolbar({
   picked,
   mobile,
   roundTrip,
+  traffic,
   lockFirst,
   lockLast,
   building,
   routeError,
   routeActive,
   onSelectingChange,
+  onTrafficChange,
   onRoundTripChange,
   onLockFirstChange,
   onLockLastChange,
@@ -425,6 +429,10 @@ export function StopsToolbar({
         disabled={!token || stops.length >= MAX_STOPS || draftOpen}
         onClick={openAdd}
       />
+      <div className="round-trip">
+        <span id="traffic-label">Consider current traffic</span>
+        <Switch checked={traffic} onChange={onTrafficChange} aria-labelledby="traffic-label" />
+      </div>
       <div className="round-trip">
         <span id="round-trip-label">Round trip</span>
         <Switch

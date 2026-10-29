@@ -8,6 +8,7 @@ import {
   loadRoundTrip,
   LOCK_FIRST_STORAGE_KEY,
   LOCK_LAST_STORAGE_KEY,
+  TRAFFIC_STORAGE_KEY,
   orderStops,
   saveLock,
   saveRoundTrip,
@@ -27,6 +28,7 @@ export function App() {
   const [picked, setPicked] = useState<MapCenter | null>(null);
   const [mobile] = useState(() => window.matchMedia(MOBILE_QUERY).matches);
   const [roundTrip, setRoundTrip] = useState(loadRoundTrip);
+  const [traffic, setTraffic] = useState(() => loadLock(TRAFFIC_STORAGE_KEY));
   const [lockFirst, setLockFirst] = useState(() => loadLock(LOCK_FIRST_STORAGE_KEY));
   const [lockLast, setLockLast] = useState(() => loadLock(LOCK_LAST_STORAGE_KEY));
   const [route, setRoute] = useState<RouteGeometry[] | null>(null);
@@ -42,6 +44,10 @@ export function App() {
   useEffect(() => {
     saveRoundTrip(roundTrip);
   }, [roundTrip]);
+
+  useEffect(() => {
+    saveLock(TRAFFIC_STORAGE_KEY, traffic);
+  }, [traffic]);
 
   useEffect(() => {
     saveLock(LOCK_FIRST_STORAGE_KEY, lockFirst);
@@ -100,6 +106,11 @@ export function App() {
     setStops(updater);
   }
 
+  function changeTraffic(next: boolean) {
+    clearRoute();
+    setTraffic(next);
+  }
+
   function changeRoundTrip(next: boolean) {
     if (lockFirst && lockLast) {
       return;
@@ -145,6 +156,7 @@ export function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roundTrip,
+          traffic,
           lockFirst,
           lockLast,
           stops: snapshot.map(({ id, longitude, latitude }) => ({ id, longitude, latitude })),
@@ -205,12 +217,14 @@ export function App() {
             picked={picked}
             mobile={mobile}
             roundTrip={roundTrip}
+            traffic={traffic}
             lockFirst={lockFirst}
             lockLast={lockLast}
             building={building}
             routeError={routeError}
             routeActive={route !== null}
             onSelectingChange={changeSelecting}
+            onTrafficChange={changeTraffic}
             onRoundTripChange={changeRoundTrip}
             onLockFirstChange={changeLockFirst}
             onLockLastChange={changeLockLast}
